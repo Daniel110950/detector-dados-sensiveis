@@ -1,0 +1,4 @@
+Usuário: Daniel
+Email: daniel@email.com
+Senha: 123456
+API_KEY=sk-12345abc
