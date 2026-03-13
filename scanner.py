@@ -11,9 +11,8 @@ PADROES = {
 
 
 def ler_arquivo(caminho):
-    with open(caminho, "r", encoding="utf-8") as arquivo:
-        conteudo = arquivo.read()
-    return conteudo
+    with open(caminho, "r", encoding="utf-8") as f:
+     return f.read()  # retorna o conteúdo do arquivo como string
 
 
 
