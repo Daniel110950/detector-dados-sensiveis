@@ -103,6 +103,19 @@
       <div id="status" class="status"></div>
       <div id="results" class="results"></div>
     </div>
+ 
+   <div class="row" style="margin-top:16px; justify-content:flex-end">
+  <span class="pill">Formato:</span>
+
+  <select id="downloadFormat" class="pill">
+    <option value="json">JSON</option>
+    <option value="txt">TXT</option>
+    <option value="csv">CSV</option>
+  </select>
+
+  <button id="downloadBtn" class="btn">Baixar relatório</button>
+</div>
+
 
     <footer>⚠️ Use apenas arquivos de teste. Evite dados reais em repositório público.</footer>
   </div>
@@ -185,3 +198,27 @@
 </script>
 </body>
 </html>
+
+<script>
+  document.getElementById("downloadBtn").addEventListener("click", async () => {
+    const format = document.getElementById("downloadFormat").value;
+
+    const resp = await fetch(`/download?format=${format}`);
+    if (!resp.ok) {
+      alert("Nenhum relatório disponível para download");
+      return;
+    }
+
+    const blob = await resp.blob();
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `relatorio.${format}`;
+    document.body.appendChild(a);
+    a.click();
+
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  });
+</script>

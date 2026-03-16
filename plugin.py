@@ -2,7 +2,10 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse
 from pathlib import Path
 import scanner
+from fastapi.responses import StreamingResponse
+import io, json, csv
 
+ULTIMO_RESULTADO = []
 app = FastAPI()
 
 ALLOWED_EXT = {".txt", ".log", ".csv", ".md", ".json"}
@@ -44,5 +47,54 @@ async def upload_arquivos(files: list[UploadFile] = File(...)):
             "filename": f.filename,
             "achados": achados
         })
+    global ULTIMO_RESULTADO
+    ULTIMO_RESULTADO = results
 
     return {"count": len(results), "results": results}
+
+@app.get("/download")
+def download(format: str = "json"):
+    if not ULTIMO_RESULTADO:
+        raise HTTPException(status_code=400, detail="Nenhum relatório disponível")
+
+    if format == "json":
+        data = json.dumps(ULTIMO_RESULTADO, ensure_ascii=False, indent=2)
+        return StreamingResponse(
+            io.StringIO(data),
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=relatorio.json"}
+        )
+
+    if format == "txt":
+        out = io.StringIO()
+        for f in ULTIMO_RESULTADO:
+            out.write(f"Arquivo: {f['filename']}\n")
+            for tipo, itens in f["achados"].items():
+                out.write(f"  {tipo}:\n")
+                for i in itens:
+                    out.write(f"    - {i}\n")
+            out.write("\n")
+
+        return StreamingResponse(
+            io.StringIO(out.getvalue()),
+            media_type="text/plain",
+            headers={"Content-Disposition": "attachment; filename=relatorio.txt"}
+        )
+
+    if format == "csv":
+        out = io.StringIO()
+        writer = csv.writer(out)
+        writer.writerow(["arquivo", "tipo", "valor_mascarado"])
+
+        for f in ULTIMO_RESULTADO:
+            for tipo, itens in f["achados"].items():
+                for i in itens:
+                    writer.writerow([f["filename"], tipo, i])
+
+        return StreamingResponse(
+            io.StringIO(out.getvalue()),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=relatorio.csv"}
+        )
+
+    raise HTTPException(status_code=400, detail="Formato inválido")
