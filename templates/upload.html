@@ -1,16 +1,187 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <title>Detector de Dados Sensíveis</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Detector de Dados Sensíveis</title>
+  <style>
+    :root{
+      --bg:#0b1220; --card:#101a2f; --muted:#8ea0c7; --text:#e8eeff;
+      --accent:#4f8cff; --accent2:#7c5cff; --danger:#ff5c7a; --ok:#28d17c;
+      --border:rgba(255,255,255,.10);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100vh; display:grid; place-items:center;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(900px 500px at 20% 10%, rgba(79,140,255,.25), transparent 60%),
+                  radial-gradient(900px 500px at 80% 20%, rgba(124,92,255,.25), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+    }
+    .wrap{width:min(980px, 92vw)}
+    .header{display:flex; align-items:center; gap:14px; margin-bottom:18px}
+    .logo{
+      width:44px;height:44px;border-radius:12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display:grid; place-items:center; font-weight:800;
+      box-shadow: 0 12px 30px rgba(79,140,255,.25);
+    }
+    .title h1{margin:0;font-size:28px;letter-spacing:.2px}
+    .title p{margin:4px 0 0;color:var(--muted);font-size:14px}
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:18px;
+      box-shadow: 0 20px 50px rgba(0,0,0,.35);
+    }
+    .row{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
+    .file{
+      flex:1 1 420px; display:flex; align-items:center; gap:10px;
+      padding:12px; border:1px dashed rgba(255,255,255,.18); border-radius:14px;
+      background: rgba(16,26,47,.55);
+    }
+    input[type="file"]{width:100%; color:var(--muted)}
+    .btn{
+      appearance:none; border:0; cursor:pointer;
+      padding:12px 16px; border-radius:14px; font-weight:700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color:white;
+      box-shadow: 0 12px 30px rgba(79,140,255,.25);
+    }
+    .btn:disabled{opacity:.55; cursor:not-allowed}
+    .pill{
+      padding:8px 10px; border:1px solid var(--border); border-radius:999px;
+      color:var(--muted); font-size:12px; background: rgba(16,26,47,.35);
+    }
+    .hint{margin-top:10px; color:var(--muted); font-size:12px}
+    .status{margin-top:14px; font-size:13px}
+    .status.ok{color:var(--ok)}
+    .status.err{color:var(--danger)}
+    .results{margin-top:16px; display:grid; gap:12px}
+    .fileResult{
+      border:1px solid var(--border); border-radius:16px; padding:14px;
+      background: rgba(16,26,47,.45);
+    }
+    .fileResult h3{margin:0 0 6px; font-size:14px}
+    .grid{display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin-top:10px}
+    .box{
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px; padding:10px; background: rgba(0,0,0,.18);
+    }
+    .box .k{color:var(--muted); font-size:12px; margin-bottom:6px}
+    .item{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px}
+    .empty{color:var(--muted); font-size:12px}
+    footer{margin-top:12px; color:var(--muted); font-size:12px}
+  </style>
 </head>
 <body>
-    <h2>Enviar arquivo para análise</h2>
+  <div class="wrap">
+    <div class="header">
+      <div class="logo">DS</div>
+      <div class="title">
+        <h1>Detector de Dados Sensíveis</h1>
+        <p>Upload e análise com mascaramento automático (sem expor valores reais).</p>
+      </div>
+    </div>
 
-    <form action="/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" required>
-        <br><br>
-        <button type="submit">Analisar</button>
-    </form>
+    <div class="card">
+      <div class="row">
+        <div class="file">
+          <input id="files" type="file" name="files" multiple
+                 accept=".txt,.log,.csv,.md,.json" />
+        </div>
+        <button id="btn" class="btn">Analisar</button>
+        <span class="pill">Suporta: .txt .log .csv .md .json</span>
+      </div>
+
+      <div class="hint">
+        Dica: você pode selecionar múltiplos arquivos (Ctrl/Shift). [2](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/file)[3](https://www.w3schools.com/TAGS/att_input_multiple.asp)
+      </div>
+
+      <div id="status" class="status"></div>
+      <div id="results" class="results"></div>
+    </div>
+
+    <footer>⚠️ Use apenas arquivos de teste. Evite dados reais em repositório público.</footer>
+  </div>
+
+<script>
+  const btn = document.getElementById("btn");
+  const filesInput = document.getElementById("files");
+  const statusEl = document.getElementById("status");
+  const resultsEl = document.getElementById("results");
+
+  function setStatus(msg, type){
+    statusEl.className = "status " + (type || "");
+    statusEl.textContent = msg || "";
+  }
+
+  function render(data){
+    resultsEl.innerHTML = "";
+    (data.results || []).forEach(r => {
+      const wrap = document.createElement("div");
+      wrap.className = "fileResult";
+      wrap.innerHTML = `<h3>Arquivo: ${r.filename}</h3>`;
+      const grid = document.createElement("div");
+      grid.className = "grid";
+
+      const achados = r.achados || {};
+      Object.keys(achados).forEach(tipo => {
+        const box = document.createElement("div");
+        box.className = "box";
+        box.innerHTML = `<div class="k">${tipo}</div>`;
+        const itens = achados[tipo] || [];
+        if(itens.length === 0){
+          box.innerHTML += `<div class="empty">Nada encontrado</div>`;
+        } else {
+          itens.forEach(v => {
+            const div = document.createElement("div");
+            div.className = "item";
+            div.textContent = v;
+            box.appendChild(div);
+          });
+        }
+        grid.appendChild(box);
+      });
+
+      wrap.appendChild(grid);
+      resultsEl.appendChild(wrap);
+    });
+  }
+
+  btn.addEventListener("click", async () => {
+    const files = filesInput.files;
+    if(!files || files.length === 0){
+      setStatus("Selecione pelo menos 1 arquivo.", "err");
+      return;
+    }
+
+    btn.disabled = true;
+    setStatus("Analisando...", "");
+
+    try{
+      const fd = new FormData();
+      for(let i=0;i<files.length;i++){
+        fd.append("files", files[i]);
+      }
+
+      const resp = await fetch("/upload", { method:"POST", body: fd });
+      const data = await resp.json();
+
+      if(!resp.ok){
+        setStatus(data.detail || "Erro ao analisar arquivo.", "err");
+      } else {
+        setStatus(`OK. Arquivos analisados: ${data.count}`, "ok");
+        render(data);
+      }
+    } catch(e){
+      setStatus("Falha de conexão com o servidor.", "err");
+    } finally{
+      btn.disabled = false;
+    }
+  });
+</script>
 </body>
 </html>
